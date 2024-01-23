@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    sh 'rm -rf allure-report'
+                    sh 'rm -rf reports/'
+                }
+                checkout([
+                $class: 'GitSCM', 
+                branches: [[name: '*/main']], 
+                doGenerateSubmoduleConfigurations: false, 
+                extensions: [], 
+                submoduleCfg: [], 
+                userRemoteConfigs: [[url: 'https://github.com/MdyLdp/wdio-cucumber-poc.git']]
+                ])
+            }
+        }
+
+        stage('Build') {
+            steps {
+                nodejs(nodeJSInstallationName: 'recent node') {
+                    sh 'node -v'
+                    sh 'npm list -g --depth=0'
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                script {
+                    try {
+                        nodejs(nodeJSInstallationName: 'recent node') {
+                            sh 'npm install'  // Install dependencies if needed
+                            sh 'npm run test'
+                        }
+                    } catch (Exception e) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "Tests failed but continuing with the build"
+                    }
+                }
+            }
+        }
+
+        stage('Allure Reports') {
+            steps {
+                script {
+                    sh 'pwd'
+                    allure([
+                        includeProperties: false,
+                        jdk: '',
+                        properties: [],
+                        reportBuildPolicy: 'ALWAYS',
+                        results: [[path: 'reports/local/allure-results']]
+                    ])
+                }
+            }
+        }
+    }
+}
